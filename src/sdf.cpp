@@ -173,17 +173,20 @@ struct SDF::Impl {
         }
     }
 
-    Points sample_surface(int num_points) const {
+    std::pair<Points,Points> sample_surface(int num_points) const {
         if (face_area.rows() == 0) {
             std::cerr << "ERROR: No faces, can't sample surface.\n";
-            return Points();
+            return std::make_pair<Points,Points>({},{});
         }
         auto& rg = get_rng();
         std::uniform_real_distribution<float> uniform(
             0.0f, 1.0f - std::numeric_limits<float>::epsilon());
         float running = 0.f;
 
-        Eigen::Matrix<float, Eigen::Dynamic, 3, Eigen::RowMajor> result(
+        Points points(
+            num_points, 3);
+
+        Points normals(
             num_points, 3);
 
         // Inverse distribution sampling:
@@ -220,17 +223,23 @@ struct SDF::Impl {
                 bc.cross(face_normal.row(i)).normalized();
             bool a_dir_of_bc = ab.dot(perp) < 0.0;
 
+            const Eigen::Matrix<float, 1, 3, Eigen::RowMajor> a_ab_ac = a + ab + ac;
+            const Eigen::Matrix<float, 1, 3, Eigen::RowMajor> diagonal_dir = (a_ab_ac - a).normalized();
+
             // Random in quadrilateral
-            result.row(j).noalias() =
+            points.row(j).noalias() =
                 a + uniform(rg) * ab +
                 uniform(rg) * ac;  // Reflect over bc, if we're over it
-            const float bp_dot_perp = (result.row(j) - b).dot(perp);
+            const float bp_dot_perp = (points.row(j) - b).dot(perp);
             const bool p_dir_of_bc = bp_dot_perp >= 0.0;
             if (p_dir_of_bc != a_dir_of_bc) {
-                result.row(j).noalias() -= bp_dot_perp * perp * 2.f;
+                points.row(j).noalias() -= bp_dot_perp * diagonal_dir * 2.f;
             }
+
+            // Calculate normals
+            normals.row(j) = face_normal.row(i);
         }
-        return result;
+        return std::pair<Points,Points>(points,normals);
     }
 
     // Input vertices
@@ -390,7 +399,7 @@ Eigen::Matrix<bool, Eigen::Dynamic, 1> SDF::contains(
 
 void SDF::update() { p_impl->update(); }
 
-Points SDF::sample_surface(int num_points) const {
+std::pair<Points,Points> SDF::sample_surface(int num_points) const {
     return p_impl->sample_surface(num_points);
 }
 }  // namespace sdf

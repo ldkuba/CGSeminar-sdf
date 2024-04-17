@@ -31,6 +31,7 @@
 #include <cstdint>
 
 #include <memory>
+#include <utility>
 #include <vector>
 #include <thread>
 #ifdef __GNUC__
@@ -209,8 +210,9 @@ struct SDF {
 
     /*** MISC UTILITIES ***/
     // Sample 'num_points' points uniformly on surface, output (num_points, 3).
+    // Returns points and normals at those points.
     // Note: this takes O(num_points * log(num_faces)) time.
-    Points sample_surface(int num_points) const;
+    std::pair<Points, Points> sample_surface(int num_points) const;
 
     /*** DATA ACCESSORS ***/
     // Get adjacent faces of point at verts[pointid]
